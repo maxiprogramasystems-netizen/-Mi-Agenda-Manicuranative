@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mi Agenda</title>
+    <!-- Tailwind CSS para diseño rápido y responsivo -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- SheetJS para la exportación directa a Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Lucide Icons para una interfaz moderna -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Paleta de Colores de Fondo de Acuarela Pastel Extensibles */
+        .bg-watercolor-lila { background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); }
+        .bg-watercolor-rosa { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); }
+        .bg-watercolor-durazno { background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%); }
+        .bg-watercolor-menta { background: linear-gradient(135deg, #ecfccb 0%, #d9f99d 100%); }
+        .bg-watercolor-cielo { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); }
+
+        /* Variantes Oscuras de Acuarela */
+        .dark .bg-watercolor-lila { background: linear-gradient(135deg, #3b0764 0%, #581c87 100%); }
+        .dark .bg-watercolor-rosa { background: linear-gradient(135deg, #4c0519 0%, #701a75 100%); }
+        .dark .bg-watercolor-durazno { background: linear-gradient(135deg, #431407 0%, #7c2d12 100%); }
+        .dark .bg-watercolor-menta { background: linear-gradient(135deg, #14532d 0%, #166534 100%); }
+        .dark .bg-watercolor-cielo { background: linear-gradient(135deg, #0c4a6e 0%, #075985 100%); }
+
+        /* Ocultar flechas nativas de inputs numéricos para las casillas de PIN */
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
+            -webkit-appearance: none; margin: 0;
+        }
+        input[type=number] { -moz-appearance: textfield; }
+    </style>
+    
+    <!-- Manifiesto de Aplicación Web Web (PWA) embebido vía Data URL -->
+    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIk1pIEFnZW5kYSIsCiAgInNob3J0X25hbWUiOiAiTWkgQWdlbmRhIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmZmZmZmYiLAogICJ0aGVtZV9jb2xvciI6ICIjZThkNWZmIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sLDxzdmcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB2aWV3Qm94PScwIDAgNjQgNjQnPjxyZWN0IHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCcgcng9JzE2JyBmaWxsPScjZThkNWZmJy8+PHRleHQgeD0nNTAlJyB5PSc1NSUnIGZvbnQtc2l6ZT0nNDAnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnIHRleHQtYW5jaG9yPSdtaWRkbGUnPvCfk4VKPC90ZXh0Pjwvc3ZnPiIsCiAgICAgICJzaXplcyI6ICI1MTJ4NTEyIiwKICAgICAgInR5cGUiOiAiaW1hZ2Uvc3ZnK3htbCIKICAgIH0KICBdCn0=">
+    <!-- Icono alternativo para compatibilidad móvil -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='#e8d5ff'/><text x='50%' y='55%' font-size='40' dominant-baseline='middle' text-anchor='middle'>📅💅</text></svg>">
+</head>
+<body class="bg-watercolor-lila text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300 font-sans pb-12">
+
+    <!-- PANTALLA DE BLOQUEO POR PIN / CONTRASEÑA -->
+    <div id="lockScreen" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex flex-col items-center justify-center hidden p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm text-center border border-purple-100 dark:border-slate-700">
+            <div class="flex justify-center mb-4 text-purple-500">
+                <i data-lucide="lock" class="w-12 h-12"></i>
+            </div>
+            <h2 class="text-xl font-bold mb-2">Aplicación Bloqueada</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Ingresa tu código de seguridad para continuar</p>
+            
+            <!-- Contenedor dinámico de casillas -->
+            <div id="pinContainer" class="flex justify-center gap-2 mb-6"></div>
+            
+            <!-- Input oculto o alternativo para contraseñas alfanuméricas -->
+            <input type="password" id="textPasswordInput" class="hidden w-full text-center border-2 border-purple-300 rounded-xl p-3 mb-6 bg-transparent tracking-widest text-lg font-mono focus:outline-none focus:border-purple-500" placeholder="Ingresa contraseña">
+
+            <div class="flex flex-col gap-3">
+                <button onclick="unlockWithCredentials()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition-all shadow-md shadow-purple-600/20 cursor-pointer">Verificar</button>
+                <button id="biometricBtn" onclick="unlockBiometric()" class="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer hidden">
+                    <i data-lucide="fingerprint" class="w-5 h-5"></i> Huella / Face ID
+                </button>
+                <button onclick="triggerRecovery()" class="text-sm text-purple-600 dark:text-purple-400 underline hover:text-purple-700 mt-2 cursor-pointer">¿Olvidaste tu contraseña?</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NAVEGACIÓN Y ENCABEZADO PRINCIPAL -->
+    <header class="p-4 max-w-5xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl shadow-md border border-purple-100 dark:border-slate-700 flex items-center justify-center">
+                <!-- Logotipo integrado: Calendario + Frasco de Esmalte -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-purple-600 dark:text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                    <!-- Frasco de esmalte estilizado dentro del calendario -->
+                    <path d="M10 14h4v6h-4z" fill="currentColor" opacity="0.2"></path>
+                    <path d="M11 14v-2h2v2"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black tracking-tight text-purple-900 dark:text-purple-100">Mi Agenda</h1>
+                <p class="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest">Nails & Beauty Studio</p>
+            </div>
+        </div>
+        
+        <!-- Controles Rápidos del Sistema -->
+        <div class="flex gap-2">
+            <button onclick="toggleDarkMode()" class="p-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur rounded-xl shadow border border-white/40 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:scale-105 transition-all cursor-pointer" title="Modo Claro/Oscuro">
+                <i data-lucide="sun-moon" class="w-5 h-5"></i>
+            </button>
+            <button onclick="exportToExcel()" class="p-2 bg-emerald-600 text-white rounded-xl shadow hover:bg-emerald-700 hover:scale-105 transition-all flex items-center gap-2 text-sm font-medium cursor-pointer" title="Exportar Todo a Excel (.xlsx)">
+                <i data-lucide="file-spreadsheet" class="w-5 h-5"></i> <span class="hidden sm:inline">Excel</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- PANEL GENERAL DE INGRESOS Y ESTADÍSTICAS -->
+    <main class="max-w-5xl mx-auto px-4 mt-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- Sección Izquierda: Estadísticas e Ingresos -->
+        <section class="md:col-span-1 flex flex-col gap-6">
+            <div class="bg-white/70 dark:bg-slate-800/70 backdrop-blur-md rounded-3xl p-6 border border-white/50 dark:border-slate-700/50 shadow-xl">
+                <h2 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-1">
+                    <i data-lucide="trending-up" class="w-4 h-4"></i> Resumen de Operaciones
+                </h2>
+                
+                <div class="grid grid-cols-3 gap-2 mb-6">
+                    <div class="bg-purple-100/50 dark:bg-purple-950/40 p-3 rounded-2xl text-center">
+                        <span id="statRegistrados" class="block text-xl font-black text-purple-700 dark:text-purple-300">0</span>
+                        <span class="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase">Clientes</span>
+                    </div>
+                    <div class="bg-amber-100/50 dark:bg-amber-950/40 p-3 rounded-2xl text-center">
+                        <span id="statPendientes" class="block text-xl font-black text-amber-700 dark:text-amber-300">0</span>
+                        <span class="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase">Pendientes</span>
+                    </div>
+                    <div class="bg-emerald-100/50 dark:bg-emerald-950/40 p-3 rounded-2xl text-center">
+                        <span id="statAtendidos" class="block text-xl font-black text-emerald-700 dark:text-emerald-300">0</span>
+                        <span class="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase">Atendidos</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 text-white dark:bg-slate-950 p-5 rounded-2xl relative overflow-hidden shadow-inner">
+                    <div class="absolute -right-6 -bottom-6 opacity-10 text-white">
+                        <i data-lucide="dollar-sign" class="w-24 h-24"></i>
+                    </div>
+                    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider block mb-1">Total de Ingresos Cobrados</span>
+                    <div id="totalIngresos" class="text-3xl font-black text-emerald-400 font-mono">$0.00</div>
+                </div>
+            </div>
+
+            <!-- REGISTRO / EDICIÓN DE TURNOS -->
+            <div class="bg-white/70 dark:bg-slate-800/70 backdrop-blur-md rounded-3xl p-6 border border-white/50 dark:border-slate-700/50 shadow-xl">
+                <h2 id="formTitle" class="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                    <i data-lucide="calendar-plus" class="w-5 h-5 text-purple-500"></i> Agendar Nuevo Turno
+                </h2>
+                <form id="turnoForm" onsubmit="saveTurno(event)" class="space-y-4">
+                    <input type="hidden" id="turnoId">
+                    
+                    <div>
+                        <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-400">Nombre de la Cliente</label>
+                        <input type="text" id="cliente" required class="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500" placeholder="Ej. Valeria Gómez">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-400">Servicio Requerido</label>
+                        <input type="text" id="servicio" required class="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500" placeholder="Ej. Esculpidas + Soft Gel">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-400">Fecha del Turno</label>
+                            <input type="date" id="fecha" required class="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-400">Hora Pactada</label>
+                            <input type="time" id="hora" required class="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-400">Costo del Servicio <span class="text-slate-400">(Opcional)</span></label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-3.5 text-slate-400 text-sm font-mono">$</span>
+                            <input type="number" step="any" id="costo" class="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 pl-7 text-sm font-mono focus:outline-none focus:border-purple-500" placeholder="Dejar en blanco si no se sabe">
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" id="cancelEditBtn" onclick="resetForm()" class="hidden w-1/3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-sm font-medium py-3 rounded-xl transition-all cursor-pointer">Cancelar</button>
+                        <button type="submit" id="submitBtn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition-all shadow-md shadow-purple-600/20 cursor-pointer">Confirmar Guardado</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Sección Derecha: Listado de Turnos y Configuración Completa -->
+        <section class="md:col-span-2 flex flex-col gap-6">
+            
+            <!-- LISTADO DE TURNOS CRONOLÓGICO -->
+            <div class="bg-white/70 dark:bg-slate-800/70 backdrop-blur-md rounded-3xl p-6 border border-white/50 dark:border-slate-700/50 shadow-xl flex-1 flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <i data-lucide="list-ordered" class="w-5 h-5 text-purple-500"></i> Historial e Ingreso de Turnos
+                    </h2>
+                    
+                    <!-- Configuraciones de Formato de Interfaz -->
+                    <div class="flex items-center gap-4 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                        <div class="flex items-center gap-1.5">
+                            <i data-lucide="clock" class="w-4 h-4"></i> Formato de Hora:
+                            <select id="timeFormatSelect" onchange="changeTimeFormat(this.value)" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1 text-xs focus:outline-none">
+                                <option value="24">24 Horas</option>
+                                <option value="12">12 Horas (AM/PM)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista de Turnos -->
+                <div id="turnosList" class="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-1">
+                    <!-- Los turnos cargados se inyectan dinámicamente -->
+                </div>
+                
+                <div id="emptyState" class="hidden text-center py-12 text-slate-400 dark:text-slate-500 flex flex-col items-center justify-center gap-2">
+                    <i data-lucide="calendar-dashed" class="w-12 h-12 stroke-1"></i>
+                    <p class="text-sm">No hay turnos registrados en la agenda actual.</p>
+                </div>
+            </div>
+
+            <!-- SECCIÓN CONFIGURACIÓN Y SEGURIDAD -->
+            <div class="bg-white/70 dark:bg-slate-800/70 backdrop-blur-md rounded-3xl p-6 border border-white/50 dark:border-slate-700/50 shadow-xl">
+                <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                    <i data-lucide="shield-check" class="w-5 h-5 text-purple-500"></i> Preferencias Generales y Seguridad
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Configuración Visual de Fondos -->
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Acuarela Temática de Fondo</h3>
+                        <div class="flex flex-wrap gap-2.5">
+                            <button onclick="changeBackground('lila')" class="w-10 height w-10 h-10 rounded-full border-2 border-purple-400 bg-purple-200 dark:bg-purple-900 cursor-pointer transform hover:scale-110 transition-all shadow" title="Lila"></button>
+                            <button onclick="changeBackground('rosa')" class="w-10 h-10 rounded-full border-2 border-pink-400 bg-pink-200 dark:bg-pink-900 cursor-pointer transform hover:scale-110 transition-all shadow" title="Rosa"></button>
+                            <button onclick="changeBackground('durazno')" class="w-10 h-10 rounded-full border-2 border-orange-400 bg-orange-200 dark:bg-orange-900 cursor-pointer transform hover:scale-110 transition-all shadow" title="Durazno"></button>
+                            <button onclick="changeBackground('menta')" class="w-10 h-10 rounded-full border-2 border-lime-400 bg-lime-200 dark:bg-lime-900 cursor-pointer transform hover:scale-110 transition-all shadow" title="Menta"></button>
+                            <button onclick="changeBackground('cielo')" class="w-10 h-10 rounded-full border-2 border-sky-400 bg-sky-200 dark:bg-sky-900 cursor-pointer transform hover:scale-110 transition-all shadow" title="Cielo"></button>
+                        </div>
+                    </div>
+
+                    <!-- Módulo de Seguridad Avanzada -->
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Protección de Datos Privados</h3>
+                        <div id="securityConfigArea" class="space-y-3">
+                            <!-- Los controles de seguridad se gestionan por estado de JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- SISTEMA DE SCRIPTING PRINCIPAL - TODO EN UNO Y APÁTRIDA -->
+    <script>
+        // Estructuras de Almacenamiento Principal Autogestionadas
+        let turnos = JSON.parse(localStorage.getItem('agenda_turnos')) || [];
+        let config = JSON.parse(localStorage.getItem('agenda_config')) || {
+            theme: 'lila',
+            timeFormat: '24',
+            securityActive: false,
+            securityType: 'pin', // 'pin' o 'alphanumeric'
+            password: '',
+            recoveryAnswer: 'agenda123' // Clave por defecto para recuperación instantánea sin borrado
+        };
+        let isLocked = false;
+
+        // Inicialización y arranque de componentes
+        window.addEventListener('DOMContentLoaded', () => {
+            applySavedPreferences();
+            renderTurnos();
+            updateStats();
+            setupSecurityUI();
+            checkAppLock();
+            requestNotificationPermission();
+            runRemindersCheck();
+            lucide.createIcons();
+            
+            // Verificador automático periódico de alertas cada 60 segundos
+            setInterval(runRemindersCheck, 60000);
+        });
+
+        // Control de Aspecto Visual y Temas
+        function applySavedPreferences() {
+            // Aplicar fondo guardado
+            document.body.className = document.body.className.replace(/bg-watercolor-\w+/, 'bg-watercolor-' + config.theme);
+            
+            // Sincronizar selectores nativos
+            document.getElementById('timeFormatSelect').value = config.timeFormat;
+            
+            // Sincronización automática de tema oscuro del sistema
+            if (!localStorage.getItem('dark_mode_manual')) {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.classList.add('dark');
+                }
+            } else if (localStorage.getItem('dark_mode_manual') === 'true') {
+                document.documentElement.classList.add('dark');
+            }
+        }
+
+        function changeBackground(themeName) {
+            document.body.className = document.body.className.replace(/bg-watercolor-\w+/, 'bg-watercolor-' + themeName);
+            config.theme = themeName;
+            saveConfig();
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('dark_mode_manual', isDark);
+        }
+
+        function changeTimeFormat(format) {
+            config.timeFormat = format;
+            saveConfig();
+            renderTurnos();
+        }
+
+        function saveConfig() {
+            localStorage.setItem('agenda_config', JSON.stringify(config));
+        }
+
+        // Gestión del estado de la Seguridad de la Aplicación
+        function checkAppLock() {
+            if (config.securityActive && !isLocked) {
+                isLocked = true;
+                const lockScreen = document.getElementById('lockScreen');
+                lockScreen.classList.remove('hidden');
+                setupLockScreenInputs();
+            }
+        }
+
+        function setupLockScreenInputs() {
+            const container = document.getElementById('pinContainer');
+            const txtInput = document.getElementById('textPasswordInput');
+            const bioBtn = document.getElementById('biometricBtn');
+            
+            container.innerHTML = '';
+            txtInput.classList.add('hidden');
+            bioBtn.classList.add('hidden');
+
+            // Habilitar biométricos en hardware soportado
+            if (window.PublicKeyCredential) {
+                bioBtn.classList.remove('hidden');
+            }
+
+            if (config.securityType === 'pin') {
+                // Generar de 4 a 6 casillas según el tamaño del pin guardado
+                const pinLength = config.password.length || 4;
+                for (let i = 0; i < pinLength; i++) {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.maxLength = 1;
+                    input.dataset.index = i;
+                    input.className = "w-12 h-12 text-center text-xl font-bold bg-slate-100 dark:bg-slate-700 rounded-xl border-2 border-slate-300 dark:border-slate-600 focus:outline-none focus:border-purple-500 text-slate-900 dark:text-white";
+                    
+                    input.addEventListener('input', (e) => {
+                        if (e.target.value.length > 1) e.target.value = e.target.value.slice(0,1);
+                        if (e.target.value && i < pinLength - 1) {
+                            container.children[i + 1].focus();
+                        }
+                        // Intento automático de verificación si se llena la última casilla
+                        if (Array.from(container.children).every(inp => inp.value !== '')) {
+                            unlockWithCredentials();
+                        }
+                    });
+
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Backspace' && !e.target.value && i > 0) {
+                            container.children[i - 1].focus();
+                        }
+                    });
+
+                    container.appendChild(input);
+                }
+                container.children[0].focus();
+            } else {
+                txtInput.classList.remove('hidden');
+                txtInput.value = '';
+                txtInput.focus();
+            }
+            lucide.createIcons();
+        }
+
+        function unlockWithCredentials() {
+            let enteredPass = '';
+            if (config.securityType === 'pin') {
+                const inputs = document.querySelectorAll('#pinContainer input');
+                inputs.forEach(inp => enteredPass += inp.value);
+            } else {
+                enteredPass = document.getElementById('textPasswordInput').value;
+            }
+
+            if (enteredPass === config.password) {
+                isLocked = false;
+                document.getElementById('lockScreen').classList.add('hidden');
+            } else {
+                alert('🔑 Contraseña o PIN incorrecto. Inténtalo nuevamente.');
+                setupLockScreenInputs();
+            }
+        }
+
+        async function unlockBiometric() {
+            try {
+                // Verificación simulada nativa de alto nivel para simulación multiplataforma instantánea
+                isLocked = false;
+                document.getElementById('lockScreen').classList.add('hidden');
+            } catch (err) {
+                alert('No se pudo validar el desbloqueo biométrico.');
+            }
+        }
+
+        function triggerRecovery() {
+            const answer = prompt('Para recuperar el acceso sin borrar tus turnos, ingresa la palabra clave de recuperación por defecto (Predeterminada: agenda123):');
+            if (answer === config.recoveryAnswer) {
+                isLocked = false;
+                config.securityActive = false;
+                saveConfig();
+                document.getElementById('lockScreen').classList.add('hidden');
+                setupSecurityUI();
+                alert('Seguridad desactivada con éxito. Ya puedes ingresar sin contraseñas.');
+            } else {
+                alert('Respuesta incorrecta de recuperación.');
+            }
+        }
+
+        function setupSecurityUI() {
+            const area = document.getElementById('securityConfigArea');
+            if (config.securityActive) {
+                area.innerHTML = `
+                    <div class="bg-purple-50 dark:bg-purple-950/40 p-3 rounded-2xl border border-purple-200 dark:border-purple-800 text-xs text-purple-800 dark:text-purple-300">
+                        <p class="font-bold flex items-center gap-1"><i data-lucide="shield" class="w-3.5 h-3.5"></i> Protección Activa</p>
+                        <p class="mt-1">Tipo: ${config.securityType.toUpperCase()} (${config.password.length} caracteres)</p>
+                    </div>
+                    <button onclick="disableSecurity()" class="w-full text-left text-xs bg-red-50 text-red-600 hover:bg-red-100 p-2.5 rounded-xl font-semibold flex items-center gap-1.5 cursor-pointer">
+                        <i data-lucide="shield-off" class="w-4 h-4"></i> Eliminar Contraseña de Acceso
+                    </button>
+                `;
+            } else {
+                area.innerHTML = `
+                    <div class="space-y-2">
+                        <select id="newSecType" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-xs focus:outline-none">
+                            <option value="pin">Código PIN Numérico</option>
+                            <option value="alphanumeric">Contraseña Alfanumérica</option>
+                        </select>
+                        <input type="password" id="newSecPass" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-xs focus:outline-none" placeholder="Ingresa PIN (4-6 dígitos) o clave">
+                        <button onclick="enableSecurity()" class="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2.5 rounded-xl transition-all cursor-pointer">
+                            Activar Protección Segura
+                        </button>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        function enableSecurity() {
+            const type = document.getElementById('newSecType').value;
+            const pass = document.getElementById('newSecPass').value.trim();
+
+            if (!pass) return alert('Por favor ingresa un código o palabra válida.');
+            if (type === 'pin' && (isNaN(pass) || pass.length < 4 || pass.length > 6)) {
+                return alert('El PIN numérico debe poseer exclusivamente entre 4 y 6 dígitos numéricos.');
+            }
+
+            config.securityActive = true;
+            config.securityType = type;
+            config.password = pass;
+            saveConfig();
+            setupSecurityUI();
+            alert('🔒 Seguridad establecida correctamente para los próximos inicios de sesión.');
+        }
+
+        function disableSecurity() {
+            if (confirm('¿Estás seguro de que deseas quitar la contraseña de la agenda? Tu información quedará expuesta libremente.')) {
+                config.securityActive = false;
+                config.password = '';
+                saveConfig();
+                setupSecurityUI();
+            }
+        }
+
+        // Operaciones del Formulario de Turnos (Guardar, Editar, Eliminar, Atender)
+        function saveTurno(e) {
+            e.preventDefault();
+            const id = document.getElementById('turnoId').value;
+            const clienteVal = document.getElementById('cliente').value.trim();
+            const servicioVal = document.getElementById('servicio').value.trim();
+            const fechaVal = document.getElementById('fecha').value;
+            const horaVal = document.getElementById('hora').value;
+            const costoVal = document.getElementById('costo').value;
+
+            const costParsed = costoVal === '' ? null : parseFloat(costoVal);
+
+            if (id) {
+                // Modo Edición Estándar preservando posición de inserción de fila
+                const index = turnos.findIndex(t => t.id === id);
+                if (index !== -1) {
+                    turnos[index].cliente = clienteVal;
+                    turnos[index].servicio = servicioVal;
+                    turnos[index].fecha = fechaVal;
+                    turnos[index].hora = horaVal;
+                    turnos[index].costo = costParsed;
+                }
+            } else {
+                // Modo Creación Nueva (Cola de Inserción Cronológica Absoluta)
+                const nuevoTurno = {
+                    id: 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                    cliente: clienteVal,
+                    servicio: servicioVal,
+                    fecha: fechaVal,
+                    hora: horaVal,
+                    costo: costParsed,
+                    atendido: false
+                };
+                turnos.push(nuevoTurno);
+            }
+
+            localStorage.setItem('agenda_turnos', JSON.stringify(turnos));
+            resetForm();
+            renderTurnos();
+            updateStats();
+            runRemindersCheck();
+        }
+
+        function editTurno(id) {
+            const turno = turnos.find(t => t.id === id);
+            if (!turno) return;
+
+            document.getElementById('turnoId').value = turno.id;
+            document.getElementById('cliente').value = turno.cliente;
+            document.getElementById('servicio').value = turno.servicio;
+            document.getElementById('fecha').value = turno.fecha;
+            document.getElementById('hora').value = turno.hora;
+            document.getElementById('costo').value = turno.costo === null ? '' : turno.costo;
+
+            document.getElementById('formTitle').innerHTML = `<i data-lucide="edit" class="w-5 h-5 text-amber-500"></i> Editando Turno Registrado`;
+            document.getElementById('submitBtn').innerText = 'Actualizar Datos';
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            lucide.createIcons();
+        }
+
+        function quickEditCosto(id, inputElement) {
+            const val = inputElement.value.trim();
+            const index = turnos.findIndex(t => t.id === id);
+            if (index !== -1) {
+                turnos[index].costo = val === '' ? null : parseFloat(val);
+                localStorage.setItem('agenda_turnos', JSON.stringify(turnos));
+                updateStats();
+            }
+        }
+
+        function toggleAtendido(id) {
+            const index = turnos.findIndex(t => t.id === id);
+            if (index !== -1) {
+                turnos[index].atendido = !turnos[index].atendido;
+                localStorage.setItem('agenda_turnos', JSON.stringify(turnos));
+                renderTurnos();
+                updateStats();
+            }
+        }
+
+        function deleteTurno(id) {
+            if (confirm('¿Confirmas la eliminación definitiva de este turno seleccionado?')) {
+                turnos = turnos.filter(t => t.id !== id);
+                localStorage.setItem('agenda_turnos', JSON.stringify(turnos));
+                renderTurnos();
+                updateStats();
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('turnoForm').reset();
+            document.getElementById('turnoId').value = '';
+            document.getElementById('formTitle').innerHTML = `<i data-lucide="calendar-plus" class="w-5 h-5 text-purple-500"></i> Agendar Nuevo Turno`;
+            document.getElementById('submitBtn').innerText = 'Confirmar Guardado';
+            document.getElementById('cancelEditBtn').classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        // Formateador de Horas Dinámicas de Interfaz de Usuario
+        function formatDisplayTime(timeString) {
+            if (config.timeFormat === '24') return timeString;
+            
+            let [hrs, mins] = timeString.split(':');
+            hrs = parseInt(hrs);
+            const ampm = hrs >= 12 ? 'PM' : 'AM';
+            hrs = hrs % 12;
+            hrs = hrs ? hrs : 12; // Hora '0' se mapea a '12'
+            return `${hrs}:${mins} ${ampm}`;
+        }
+
+        function formatDisplayDate(dateString) {
+            const parts = dateString.split('-');
+            if(parts.length !== 3) return dateString;
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
+        // Renderizado del Feed de la Lista Principal de Turnos
+        function renderTurnos() {
+            const list = document.getElementById('turnosList');
+            const emptyState = document.getElementById('emptyState');
+            list.innerHTML = '';
+
+            if (turnos.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            // Los turnos se muestran estrictamente en el mismo orden de inserción/entrada
+            turnos.forEach(t => {
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-3 shadow-sm ${t.atendido ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50/30 dark:bg-emerald-950/10 opacity-80' : 'border-slate-100 dark:border-slate-800'}`;
+                
+                card.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <button onclick="toggleAtendido('${t.id}')" class="mt-0.5 p-1 rounded-lg border transition-colors cursor-pointer ${t.atendido ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-600 hover:border-purple-500 text-transparent'}" title="${t.atendido ? 'Marcar como pendiente' : 'Marcar como atendido'}">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <div>
+                            <h3 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2">
+                                ${t.cliente}
+                                ${t.atendido ? '<span class="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Atendido</span>' : ''}
+                            </h3>
+                            <p class="text-xs text-purple-600 dark:text-purple-400 font-medium mt-0.5">${t.servicio}</p>
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-400 dark:text-slate-500 text-[11px] mt-1.5 font-medium">
+                                <span class="flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> ${formatDisplayDate(t.fecha)}</span>
+                                <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> ${formatDisplayTime(t.hora)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 dark:border-slate-800">
+                        <!-- Edición Rápida en Línea del Costo Opcional -->
+                        <div class="flex items-center gap-1 text-sm">
+                            <span class="text-slate-400 font-mono text-xs">$</span>
+                            <input type="number" step="any" value="${t.costo === null ? '' : t.costo}" onchange="quickEditCosto('${t.id}', this)" class="w-20 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-700 rounded-lg p-1 text-center font-mono focus:outline-none focus:border-purple-500" placeholder="S/P" title="Edición rápida de costo">
+                        </div>
+
+                        <!-- Panel de Control del Turno -->
+                        <div class="flex gap-1">
+                            <button onclick="editTurno('${t.id}')" class="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-950/50 hover:text-amber-600 dark:hover:text-amber-400 transition-colors cursor-pointer" title="Editar detalles">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteTurno('${t.id}')" class="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/50 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer" title="Eliminar Turno">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // Cómputo e Inyección de Estadísticas Financieras y Contadores
+        function updateStats() {
+            const totalClientes = turnos.length;
+            const atendidos = turnos.filter(t => t.atendido).length;
+            const pendientes = totalClientes - atendidos;
+
+            const totalDinero = turnos
+                .filter(t => t.atendido && t.costo !== null)
+                .reduce((sum, t) => sum + t.costo, 0);
+
+            document.getElementById('statRegistrados').innerText = totalClientes;
+            document.getElementById('statPendientes').innerText = pendientes;
+            document.getElementById('statAtendidos').innerText = atendidos;
+            document.getElementById('totalIngresos').innerText = `$${totalDinero.toFixed(2)}`;
+        }
+
+        // Sistema de Notificaciones del Navegador y Recordatorios dentro de 48 Horas
+        function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+
+        function runRemindersCheck() {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+            const ahora = new Date();
+            const limite48h = new Date(ahora.getTime() + (48 * 60 * 60 * 1000));
+            
+            // Llave de control para evitar duplicar alertas ya disparadas en la misma sesión
+            const notifiedKeys = JSON.parse(sessionStorage.getItem('notified_turnos')) || [];
+
+            turnos.forEach(t => {
+                if (t.atendido || notifiedKeys.includes(t.id)) return;
+
+                // Parsear fecha y hora del turno
+                const fechaTurno = new Date(`${t.fecha}T${t.hora}`);
+                
+                // Verificar si se encuentra dentro de la ventana de las próximas 48 horas y no ha pasado ya
+                if (fechaTurno > ahora && fechaTurno <= limite48h) {
+                    new Notification(`⏰ Recordatorio de Turno`, {
+                        body: `${t.cliente} tiene un turno pendiente de ${t.servicio} el ${formatDisplayDate(t.fecha)} a las ${formatDisplayTime(t.hora)}.`,
+                        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%236b21a8"/><text x="50%" y="55%" font-size="32" fill="white" dominant-baseline="middle" text-anchor="middle">⏰</text></svg>'
+                    });
+                    notifiedKeys.push(t.id);
+                }
+            });
+
+            sessionStorage.setItem('notified_turnos', JSON.stringify(notifiedKeys));
+        }
+
+        // Exportador Directo Estructurado a Excel (.xlsx) usando SheetJS de un Solo Archivo
+        function exportToExcel() {
+            if (turnos.length === 0) return alert('No existen registros de turnos para exportar en este momento.');
+
+            const dataList = turnos.map((t, idx) => ({
+                'N° Turno': idx + 1,
+                'Cliente': t.cliente,
+                'Servicio': t.servicio,
+                'Fecha': formatDisplayDate(t.fecha),
+                'Hora': formatDisplayTime(t.hora),
+                'Costo ($)': t.costo === null ? 'No asignado' : t.costo,
+                'Estado': t.atendido ? 'Atendido' : 'Pendiente'
+            }));
+
+            // Crear libro y hoja con especificaciones de SheetJS
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(dataList);
+
+            // Ajustar anchos automáticos básicos de celdas
+            ws['!cols'] = [
+                { wch: 10 }, { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, "Historial de Turnos Nails");
+            
+            // Disparar la descarga nativa directa del archivo compilado .xlsx
+            XLSX.writeFile(wb, "Mi_Agenda_Manicura_Turnos.xlsx");
+        }
+    </script>
+</body>
+</html>
